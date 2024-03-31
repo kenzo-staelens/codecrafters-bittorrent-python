@@ -8,17 +8,40 @@ import sys
 #
 # - decode_bencode(b"5:hello") -> b"hello"
 # - decode_bencode(b"10:hello12345") -> b"hello12345"
+
+def decode_string(bencoded_value):
+    colon_idx = bencoded_value.find(b":")
+    if colon_idx == -1:
+        raise ValueError("Invalid encoded string")
+    length = int(bencoded_value[:colon_idx])
+    skip = colon_idx + 1
+    decoded = bencoded_value[skip:skip+length]
+    remaining = bencoded_value[skip+len(decoded):]
+    return decoded, remaining
+
+def decode_integer(bencoded_value):
+    e_idx = bencoded_value.find(b"e")
+    if e_idx == -1:
+        raise ValueError("Invalid encoded string")
+    decoded = int(bencoded_value[1:e_idx]) # will itself also error if not parsable
+    remaining = bencoded_value[e_idx+1:]
+    return decoded, remaining
+
+def decode_list(bencoded_value):
+    bencoded_value = bencoded_value[1:]
+    result = []
+    while chr(bencoded_value[0])!="e":
+        decoded, bencoded_value = decode_bencode(bencoded_value)
+        result.append(decoded)
+    return result, bencoded_value[1:] # strip the e
+
 def decode_bencode(bencoded_value):
     if chr(bencoded_value[0]).isdigit():
-        first_colon_index = bencoded_value.find(b":")
-        if first_colon_index == -1:
-            raise ValueError("Invalid encoded string")
-        return bencoded_value[first_colon_index+1:]
+        return decode_string(bencoded_value)
     elif chr(bencoded_value[0])=="i":
-        if chr(bencoded_value[-1])!="e":
-            raise ValueError("invalid encoded integer")
-        else:
-            return int(bencoded_value[1:-1]) # will itself also error if not parsable
+        return decode_integer(bencoded_value)
+    elif chr(bencoded_value[0])=="l":
+        return decode_list(bencoded_value)
     else:
         print(bencoded_value, bencoded_value[0])
         raise NotImplementedError("Only strings are supported at the moment")
@@ -43,7 +66,7 @@ def main():
         bencoded_value = sys.argv[2].encode()
 
         # Uncomment this block to pass the first stage
-        print(json.dumps(decode_bencode(bencoded_value), default=bytes_to_str))
+        print(json.dumps(decode_bencode(bencoded_value)[0], default=bytes_to_str))
     else:
         raise NotImplementedError(f"Unknown command {command}")
 
