@@ -20,6 +20,7 @@ def decode_bencode(bencoded_value):
         else:
             return int(bencoded_string[1:-1]) # will itself also error if not parsable
     else:
+        print(bencoded_value, bencoded_value[0],bencoded_value[0]=="i")
         raise NotImplementedError("Only strings are supported at the moment")
 
 # json.dumps() can't handle bytes, but bencoded "strings" need to be
@@ -40,8 +41,6 @@ def main():
 
     if command == "decode":
         bencoded_value = sys.argv[2].encode()
-
-
 
         # Uncomment this block to pass the first stage
         print(json.dumps(decode_bencode(bencoded_value), default=bytes_to_str))
