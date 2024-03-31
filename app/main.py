@@ -17,28 +17,29 @@ def decode_bencode(bencoded_value):
     else:
         raise NotImplementedError("Only strings are supported at the moment")
 
-
-def main():
-    command = sys.argv[1]
-
-    # You can use print statements as follows for debugging, they'll be visible when running tests.
-    print("Logs from your program will appear here!")
-
-    if command == "decode":
-        bencoded_value = sys.argv[2].encode()
-
-        # json.dumps() can't handle bytes, but bencoded "strings" need to be
-        # bytestrings since they might contain non utf-8 characters.
-        #
-        # Let's convert them to strings for printing to the console.
-        def bytes_to_str(data):
+# json.dumps() can't handle bytes, but bencoded "strings" need to be
+# bytestrings since they might contain non utf-8 characters.
+#
+# Let's convert them to strings for printing to the console.
+def bytes_to_str(data):
             if isinstance(data, bytes):
                 return data.decode()
 
             raise TypeError(f"Type not serializable: {type(data)}")
 
+def main():
+    command = sys.argv[1]
+
+    # You can use print statements as follows for debugging, they'll be visible when running tests.
+    # print("Logs from your program will appear here!")
+
+    if command == "decode":
+        bencoded_value = sys.argv[2].encode()
+
+
+
         # Uncomment this block to pass the first stage
-        # print(json.dumps(decode_bencode(bencoded_value), default=bytes_to_str))
+        print(json.dumps(decode_bencode(bencoded_value), default=bytes_to_str))
     else:
         raise NotImplementedError(f"Unknown command {command}")
 
