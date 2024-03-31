@@ -14,11 +14,11 @@ def decode_bencode(bencoded_value):
         if first_colon_index == -1:
             raise ValueError("Invalid encoded string")
         return bencoded_value[first_colon_index+1:]
-    elif bencoded_value[0]==b"i":
-        if bencoded_value[-1]!="e":
+    elif chr(bencoded_value[0])=="i":
+        if chr(bencoded_value[-1])!="e":
             raise ValueError("invalid encoded integer")
         else:
-            return int(bencoded_string[1:-1]) # will itself also error if not parsable
+            return int(bencoded_value[1:-1]) # will itself also error if not parsable
     else:
         print(bencoded_value, bencoded_value[0])
         raise NotImplementedError("Only strings are supported at the moment")
