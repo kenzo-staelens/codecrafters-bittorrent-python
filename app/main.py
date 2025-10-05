@@ -2,132 +2,35 @@ import sys
 import hashlib
 import requests
 import random
-import string
 import socket
 
-def generate_peer_id():
-    # return "00112233445566778899"
-    return ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(20))
-    
+from util import generate_peer_id
+from bt_bencode.Decoder import Decoder
+from bt_bencode.Encoder import Encoder
 
 pid = generate_peer_id()
 
-def get_0th(bencoded):
-    try:
-        v0 = chr(bencoded[0])
-    except:
-        v0 = bencoded[0]
-    return v0
-
-
-def bytes_to_str(data):
-    if isinstance(data, str):
-        return data
-    if isinstance(data, bytes):
-        return data.decode()
-    raise TypeError(f"Type not serializable: {type(data)}")
-
-def decode_string(bencoded_value):
-    try:
-        colon_idx = bencoded_value.find(b":")
-    except:
-        colon_idx = bencoded_value.find(":")
-    if colon_idx == -1:
-        raise ValueError("Invalid encoded string")
-    length = int(bencoded_value[:colon_idx])
-    skip = colon_idx + 1
-    decoded = bencoded_value[skip:skip+length]
-    try:
-        decoded = bytes_to_str(decoded)
-    except UnicodeDecodeError:
-        pass
-    remaining = bencoded_value[skip+len(decoded):]
-    return decoded, remaining
-
-def decode_integer(bencoded_value):
-    try:
-        e_idx = bencoded_value.find(b"e")
-    except:
-        e_idx = bencoded_value.find("e")
-    if e_idx == -1:
-        raise ValueError("Invalid encoded string")
-    decoded = int(bencoded_value[1:e_idx]) # will itself also error if not parsable
-    remaining = bencoded_value[e_idx+1:]
-    return decoded, remaining
-
-def decode_list(bencoded_value):
-    bencoded_value = bencoded_value[1:] #strip l
-    result = []
-    while chr(bencoded_value[0])!="e":
-        decoded, bencoded_value = decode_bencode(bencoded_value)
-        result.append(decoded)
-    return result, bencoded_value[1:] # strip the e
-
-def decode_dict(bencoded_value):
-    bencoded_value = bencoded_value[1:] #strip d
-    result = {}
-    while get_0th(bencoded_value)!="e":
-        key, bencoded_value = decode_string(bencoded_value)
-        value, bencoded_value = decode_bencode(bencoded_value)
-        result[key]=value
-    return result, bencoded_value[1:] #strip e
-
-def decode_bencode(bencoded_value):
-    v0 = get_0th(bencoded_value)
-    if v0.isdigit():
-        return decode_string(bencoded_value)
-    elif v0=="i":
-        return decode_integer(bencoded_value)
-    elif v0=="l":
-        return decode_list(bencoded_value)
-    elif v0=="d":
-        return decode_dict(bencoded_value)
-    else:
-        raise NotImplementedError(f"identifier {bencoded_value[0]} not recognized:\n\t{bencoded_value}")
-
-def bencode_integer(value):
-    return f"i{value}e".encode()
-
-def bencode_string(value):
-    if type(value) == bytes:
-        return str(len(value)).encode()+b":"+value
-    return f"{len(value)}:{value}".encode()
-
-def bencode_list(value):
-    return b"l"+b"".join([bencode(x) for x in value])+b"e"
-
-def bencode_dict(value):
-    return b"d"+b"".join([bencode_string(k)+bencode(v) for k,v in value.items()])+b"e"
-
-def bencode(value):
-    if type(value)==int:
-        return bencode_integer(value)
-    elif type(value)==str or type(value)==bytes:
-        return bencode_string(value)
-    elif type(value)==list:
-        return bencode_list(value)
-    elif type(value)==dict:
-        return bencode_dict(value)
-    else:
-        raise ValueError(f"non encodable object {type(value)}")
 
 def command_decode(arg):
-    return decode_bencode(arg)[0]
+    return Decoder.decode_bencode(arg)[0]
 
 def command_info(arg):
     with open(arg,"rb") as f:
         bencoded_value = f.read()
     decoded = command_decode(bencoded_value)
-    infohash = hashlib.sha1(bencode(decoded['info'])).digest()
+    infohash = hashlib.sha1(Encoder.bencode(decoded['info'])).digest()
     return decoded, infohash
 
 def decode_peers(peers):
+    #converts raw bytes to ip:port
     decoded = []
     for i in range(0,len(peers),6):
         decoded.append(
             f"{peers[i+0]}.{peers[i+1]}.{peers[i+2]}.{peers[i+3]}:{peers[i+4]*256+peers[i+5]}"
         )
     return decoded
+
+import urllib
 
 def command_peers(torrent, infohash):
     # torrent, infohash = command_info(arg)
@@ -141,10 +44,11 @@ def command_peers(torrent, infohash):
         'uploaded':0,
         'downloaded':0,
         'left':str(left),
+        # 'left':str(1),
         'compact':1
     }
     response = requests.get(tracker, params=params)
-    peers_response = decode_bencode(response.content)[0]
+    peers_response = Decoder.decode_bencode(response.content)[0]
     peers_response['peers'] = decode_peers(peers_response['peers'])
     
     return peers_response, peer_id
@@ -200,7 +104,6 @@ def create_request(piece_idx, offset, piece_length, all_length, block_size=16*10
 
 
 def download_piece(_socket,piece, piece_length, all_length, outfile, piece_idx):
-    
     #assume just bittorrent protocol
     read_message(_socket) #first bitfield
     _socket.send(b"\x00\x00\x00\x01\x02")
